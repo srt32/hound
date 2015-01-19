@@ -1,28 +1,28 @@
-FROM phusion/passenger-ruby21
+FROM ubuntu
 
 MAINTAINER Simon Taranto "simon.taranto@gmail.com"
 
-ENV HOME /root
+RUN apt-get update -q
+RUN apt-get install -qy nginx
+RUN apt-get install -qy curl
+RUN apt-get install -qy nodejs
+RUN echo "daemon off;" >> /etc/nginx/nginx.conf
 
-CMD ["/sbin/my_init"]
+RUN curl -sSL https://get.rvm.io | bash -s stable
+RUN /bin/bash -l -c "rvm requirements"
+RUN /bin/bash -l -c "rvm install 2.2.0"
+RUN /bin/bash -l -c "gem install bundler --no-ri --no-rdoc"
 
-RUN rm -f /etc/service/nginx/down
+ADD config/container/nginx-sites.conf /etc/nginx/sites-enabled/default
+ADD config/container/start-server.sh /usr/bin/start-server
+RUN chmod +x /usr/bin/start-server
 
-RUN rm /etc/nginx/sites-enabled/default
+ADD ./ /hound
 
-ADD nginx.conf /etc/nginx/sites-enabled/hound.conf
+WORKDIR /hound
 
-RUN mkdir /home/app/hound
+RUN /bin/bash -l -c "bundle install --without development test"
 
-ADD . /home/app/hound
-RUN chown -R app:app /home/app/hound
+EXPOSE 80
 
-RUN ruby-switch --set ruby2.1
-
-WORKDIR /tmp
-ADD Gemfile /tmp/
-ADD Gemfile.lock /tmp/
-
-RUN bundle install --without development test
-
-RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+ENTRYPOINT /usr/bin/start-server
